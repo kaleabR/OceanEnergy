@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <title>IETP G47 - Lake/Ocean Wave Energy Harvester</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            box-sizing: border-box;
+            background-color: #d3cfcfda; /* or  #282c34; */
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin: 0;
+            color: black;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: black;
+        }
+
+        #container {
+            margin: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: auto;
+        }
+
+        #title {
+            margin-bottom: 20px;
+        }
+
+        #meterContainer {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-around;
+            align-items: center;
+            width: 80vw;
+            margin-bottom: 20px;
+        }
+
+        .meter {
+            border-radius: 10px;
+            border: 1px solid #ffffff;
+            padding: 20px;
+            text-align: center;
+            margin: 10px;
+
+        }
+
+        .m1 {
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, #3d3d3d 50%);
+        }
+
+        .m2 {
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, #3d3d3d 50%);
+        }
+
+        .m3 {
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0) 50%, #3d3d3d 50%);
+        }
+
+        canvas {
+            max-width: 300px;
+            max-height: 300px;
+        }
+
+        button {
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #chartContainer {
+            display: flex;
+            color: white;
+            justify-content: space-around;
+            width: 80vw;
+            margin-bottom: 20px;
+        }
+
+        #barGraph,
+        #pieChart {
+            max-width: 300px;
+            max-height: 300px;
+        }
+
+        .table-container {
+            width: 900px;
+            height: 300px;
+            overflow-y: auto;
+            margin-bottom: 100px;
+        }
+
+        .table-container table {
+            width: 100%;
+        }
+
+        .table-container th,
+        .table-container td {
+            text-align: center;
+            padding: 10px;
+        }
+
+        .table-container th {
+            background-color: #007bff7b;
+            color: rgb(0, 0, 0);
+        }
+
+        .table-container tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .table-container tbody {
+            color: rgb(0, 0, 0);
+        }
+
+        .table-container tbody tr:hover {
+            background-color: #7b7373;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <div id="container">
+        <h1 id="title">Ocean and Lake Wave Energy Harvest</h1>
+        <div id="meterContainer">
+            <!-- Current Meter -->
+            <div class="meter m1" id="currentMeter">
+                <h2 id="currentValue">{{current}}</h2>
+                <p>Current (A)</p>
+            </div>
+
+            <!-- Voltage Meter -->
+            <div class="meter m2" id="voltageMeter">
+                <h2 id="voltageValue">{{voltage}}</h2>
+                <p>Voltage (V)</p>
+            </div>
+
+
+            <!-- Wattage Meter -->
+            <div class="meter m3" id="wattageMeter">
+                <h2 id="wattageValue">{{wattage}}</h2>
+                <p>Wattage (W)</p>
+            </div>
+        </div>
+
+        <div id="chartContainer">
+            <!-- Add a canvas for the bar graph -->
+            <canvas id="myChart" style="width: 80vw; height: 30vh; color: white;"></canvas>
+
+            <!-- Add a canvas for the pie chart -->
+            <canvas id="pieChart"></canvas>
+        </div>
+        
+
+        <button id="generateReportButton">Generate Report</button>
+        <br><br>
+
+    <!-- Add a container for the report table -->
+    <div id="reportContainer" class="table-container">
+        <!-- This div will contain the dynamically generated report table -->
+        <!-- The style ensures a maximum height with a vertical scrollbar if needed -->
+        <div id="reportTableContainer">
+            <!-- Apply Bootstrap table classes -->
+            <table class="table table-bordered table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th scope="col">Timestamp</th>
+                        <th scope="col">Current (mA)</th>
+                        <th scope="col">Voltage (mV)</th>
+                        <th scope="col">Wattage (mW)</th>
+                        
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data rows will be dynamically added here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+            apiKey: "AIzaSyAevdCt7R1IrOvjkbex3cUj16F7sJzS2Uw",
+            authDomain: "oceanenergyharvesting.firebaseapp.com",
+            databaseURL: "https://oceanenergyharvesting-default-rtdb.firebaseio.com",
+            projectId: "oceanenergyharvesting",
+            storageBucket: "oceanenergyharvesting.appspot.com",
+            messagingSenderId: "920849633915",
+            appId: "1:920849633915:web:eb0120021c6fbf1bdc48de",
+            measurementId: "G-23MK7XS1W0"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getDatabase(app);
+
+        const currentValueElement = document.getElementById('currentValue');
+        const voltageValueElement = document.getElementById('voltageValue');
+        const wattageValueElement = document.getElementById('wattageValue');
+
+        // Set up a listener for real-time updates
+        // onValue(ref(db, '/yourDataPath'), (snapshot) => {
+        //     const data = snapshot.val();
+        //     // Update the HTML with current, voltage, and wattage values
+        //     currentValueElement.textContent = data.current.toFixed(6);
+        //     voltageValueElement.textContent = data.voltage.toFixed(6);
+
+        //     // Calculate and update the simulated wattage
+        //     const wattage = (parseFloat(data.current) + 0) * (parseFloat(data.voltage) + 0);
+        //     wattageValueElement.textContent = wattage.toFixed(6);
+
+        //     // Update the bar graph with new data
+        //     updateBarGraph(barGraph, data.current, data.voltage);
+        //     barGraph.update();  // Add this line
+
+        //     // Update the pie chart with new data
+        //     updatePieChart(pieChart, data.current, data.voltage);
+        // });
+
+
+        // Create chart instance
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Current', 'Voltage'],
+                datasets: [{
+                    label: 'Values',
+                    data: [0, 0],
+                    backgroundColor: ['blue', 'red'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        // Function to update the chart
+        function updateChart(chart, current, voltage) {
+            chart.data.datasets[0].data = [current, voltage];
+            chart.update();
+        }
+
+        // Create pie chart instance
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        const pieChart = new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Current', 'Voltage'],
+                datasets: [{
+                    data: [0, 0],
+                    backgroundColor: ['blue', 'orange']
+                }]
+            }
+        });
+
+
+
+        // Function to update the pie chart
+        function updatePieChart(chart, current, voltage) {
+            chart.data.datasets[0].data = [current, voltage];
+            chart.update();
+        }
+
+        function downloadCSV(csv, filename) {
+            const csvFile = new Blob([csv], { type: 'text/csv' });
+            const downloadLink = document.createElement('a');
+            downloadLink.download = filename;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = 'none';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+        }
+
+         // Array to store historical data
+            const historicalData = [];
+
+            // Function to update historical data array
+            function updateHistoricalData(current, voltage, wattage) {
+                historicalData.push({
+                    Time: new Date().toLocaleTimeString(),
+                    Current : current.toFixed(3),
+                    Voltage: voltage.toFixed(3),
+                    Wattage: wattage.toFixed(3),
+                });
+            }
+
+            // Function to generate and display the report
+            function generateReport() {
+                // Create a table
+                const table = document.createElement('table');
+                table.border = '1';
+
+                // Create header row
+                const headerRow = table.insertRow();
+                for (const key in historicalData[0]) {
+                    const headerCell = document.createElement('th');
+                    headerCell.textContent = key;
+                    headerRow.appendChild(headerCell);
+                }
+
+                // Create data rows
+                for (const data of historicalData) {
+                    const dataRow = table.insertRow();
+                    for (const key in data) {
+                        const dataCell = dataRow.insertCell();
+                        dataCell.textContent = data[key];
+                    }
+                }
+
+                // Clear existing content and append the table to the report container
+                reportContainer.innerHTML = '';
+                reportContainer.appendChild(table);
+            }
+
+            // Add event listener for the report generation button
+            document.getElementById('generateReportButton').addEventListener('click', generateReport);
+
+            // Simulate data change at regular intervals
+            setInterval(() => {
+                window.location = window.location.href;
+                // Simulate change in data
+                const simulatedData = {
+                    current: Math.random() * 0.05,  // Limit current to 5
+                    voltage: Math.random() * 0.05,  // Limit voltage to 5
+                };
+
+
+                // Update the HTML with simulated values
+                currentValueElement.textContent = {{current}};
+                voltageValueElement.textContent = {{voltage}};
+
+                // Calculate and update the simulated wattage
+                const simulatedWattage = {{wattage}};
+                wattageValueElement.textContent = {{wattage}};
+
+                // Update the chart with simulated data
+                updateChart(chart, {{current}}, {{voltage}});
+
+                // Update the pie chart with simulated data
+                updatePieChart(pieChart, {{current}}, {{voltage}});
+
+                 // Update historical data
+                updateHistoricalData({{current}}, {{voltage}}, {{wattage}});
+
+            }, 4000); //  4000 milliseconds for 4 seconds
+
+    </script>
+</body>
+
+</html>
+
